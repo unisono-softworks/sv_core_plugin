@@ -104,10 +104,11 @@ jQuery(document).on('click', '.sv_setting_header .sv_setting_responsive_select >
 
 /* Responsive Inherit Overwrite */
 jQuery(document).on('click', '.sv_setting_header .sv_setting_responsive_force', function() {
-    const container = jQuery(this).closest('.sv_setting');
-    const settings_source = container.children('.active').first();
-    const settings_source_inputs = settings_source.find('.sv_input');
-    const is_color_setting = container.hasClass('sv_setting_color_parent');
+	const container = jQuery(this).closest('.sv_setting');
+	const settings_content = container.find('.sv_setting_content').first(); // Find the .sv_setting_content within the container
+	const settings_source = settings_content.children('.active').first(); // Then find the active child within .sv_setting_content
+	const settings_source_inputs = settings_source.find('.sv_input'); // Find the inputs within the active child
+	const is_color_setting = container.hasClass('sv_setting_color_parent');
 
     settings_source_inputs.each(function(){
         const el    = jQuery(this);
