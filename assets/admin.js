@@ -208,19 +208,39 @@ function bind_events(){ //@todo remove deprecated functions and move all of this
     jQuery( '.sv_setting .sv_setting_box_shadow select' ).unbind().on( 'change', function( e ) { sv_setting_box_shadow( e.target ) } );
 
 
-    jQuery( 'button[data-sv_admin_modal], input[data-sv_admin_modal]' ).unbind().on( 'click', function() {
-        let title 	= jQuery( this ).data( 'sv_admin_modal' )[0].title;
-        let desc 	= jQuery( this ).data( 'sv_admin_modal' )[0].desc;
-        let type	= jQuery( this ).data( 'sv_admin_modal' )[0].type;
-        let args	= jQuery( this ).data( 'sv_admin_modal' )[0].args ? jQuery( this ).data( 'sv_admin_modal' )[0].args : {};
-        let ajax	= jQuery( this ).data( 'sv_admin_ajax' );
+    jQuery('button[data-sv_admin_modal], input[data-sv_admin_modal]').unbind().on('click', function () {
+        let modalData = jQuery(this).data('sv_admin_modal');
+        let args = jQuery(this).data('sv_admin_args');
+        args = args[0] ?? {'payload':{}};
+        let dataFormID = jQuery(this).data('sv_admin_data_form_id');
 
-        if ( ajax !== 'undefined' ) {
-            args.ajax = ajax;
+        // Normalize modalData
+        if (typeof modalData === 'string') {
+            try {
+                modalData = JSON.parse(modalData);
+            } catch (e) {
+                modalData = [{}];
+            }
+        } else if (!Array.isArray(modalData)) {
+            modalData = [modalData];
         }
 
-        show_modal( title, desc, type, args );
-    } );
+        let title = modalData[0]?.title || '';
+        let desc = modalData[0]?.desc || '';
+        let type = modalData[0]?.type || '';
+
+        // If form is attached, serialize it and assign to ajax[0].data
+        if (dataFormID) {
+            let formDataArray = jQuery('#' + dataFormID).serializeArray();
+
+            formDataArray.forEach(function (field) {
+                args.payload[field.name] = field.value;
+            });
+        }
+
+        show_modal(title, desc, type, args);
+    });
+
 
     jQuery( '.sv_admin_modal .sv_admin_modal_close, .sv_admin_modal .sv_admin_modal_cancel, .sv_admin_modal .sv_admin_modal_submit' ).unbind().on( 'click', function() {
         jQuery( this ).parents( '.sv_admin_modal' ).removeClass( 'show' );
@@ -256,17 +276,29 @@ function bind_events(){ //@todo remove deprecated functions and move all of this
     } );
 
     /* ===== Ajax Check ===== */
-    jQuery( 'button[data-sv_admin_ajax], input[data-sv_admin_ajax]' ).on( 'click', function() {
-        let ajax = jQuery( this ).data( 'sv_admin_ajax' );
-        let is_modal = jQuery( this ).data( 'sv_admin_modal' ) ? true : false;
+    jQuery('button[data-sv_admin_args], input[data-sv_admin_args]').on('click', function () {
+        let args = jQuery(this).data('sv_admin_args');
+        args = args[0] ?? {'payload':{}};
+        let dataFormID = jQuery(this).data('sv_admin_data_form_id');
+        let is_modal = jQuery(this).data('sv_admin_modal') ? true : false;
 
-        if ( ! is_modal ) {
-            sv_admin_ajax_call( ajax );
+        if (dataFormID) {
+            // Convert form to array and add each field to args object
+            let formDataArray = jQuery('#' + dataFormID).serializeArray();
+
+            formDataArray.forEach(function (field) {
+                args.payload[field.name] = field.value;
+            });
         }
-    } );
+
+        if (!is_modal) {
+            sv_admin_args_call(args);
+        }
+    });
 
 
-   /* AJAX SAVE FORM ------------------------------- */
+
+    /* AJAX SAVE FORM ------------------------------- */
     let settings_form_list = jQuery('.sv_admin_section.active .sv100_settings_ajax_save_form');
 
     if( settings_form_list.length > 0 ){
@@ -515,21 +547,24 @@ function add_subpage_nav(){
 
 
 
-function sv_admin_ajax_call( data, modal = false ) {
-	if ( data[0].nonce === 'undefined' ) return false;
+function sv_admin_ajax_call( args, modal = false ) {
+
+	if ( args.nonce === 'undefined' ) return false;
 
 	if ( modal ) {
 		jQuery( '.sv_admin_modal' ).removeClass( 'show' );
+        args = JSON.parse(decodeURIComponent(atob(args)));
 	}
 
-	jQuery.post( ajaxurl, data[0], function( response ) {
-		let data = JSON.parse( response );
+	jQuery.post( ajaxurl, args, function( response ) {
+        let data = typeof response === 'string' ? JSON.parse( response ) : response;
 
-		if ( data.notice ) {
-			show_notice( data.msg, data.type )
-		} else {
-			console.log( response );
-		}
+        if ( data.notice ) {
+            alert(data.msg); // workaround for broken notices
+            //show_notice( data.msg, data.type )
+        } else {
+            console.log( response );
+        }
 	} );
 }
 
@@ -549,9 +584,9 @@ function show_modal( title, desc, type, args ) {
 
 function get_modal_content( type, args ) {
 	let content = '';
-	let ajax_call = args.ajax
-		? "onclick='sv_admin_ajax_call( " + JSON.stringify( args.ajax ) + ", true )'"
-		: '';
+	let ajax_call = args
+		? 'onclick="sv_admin_ajax_call(\'' + btoa(encodeURIComponent(JSON.stringify(args))) + '\', true)"'
+        : '';
 	let form_call = args.form
 		? 'onclick=jQuery("form#' + args.form + '").submit()'
 		: '';
